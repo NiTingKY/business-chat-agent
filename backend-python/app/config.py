@@ -14,8 +14,18 @@ class Settings(BaseSettings):
     embedding_dimension: int = 768
     openai_max_tokens: int = 2048
     openai_disable_thinking: bool = True
-    database_url: str = "sqlite+aiosqlite:///./travel_agent.db"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: str = ""
+    mysql_host: str = "localhost"
+    mysql_port: int = 3306
+    mysql_database: str = "travelagent"
+    mysql_user: str = "root"
+    mysql_password: str = "123456"
+    mysql_charset: str = "utf8mb4"
+    redis_url: str = ""
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_password: str = ""
+    redis_db: int = 0
     milvus_host: str = "localhost"
     milvus_port: int = 19530
     milvus_lite_path: str = ""
@@ -34,6 +44,23 @@ class Settings(BaseSettings):
     circuit_breaker_failure_threshold: int = 5
     circuit_breaker_recovery_timeout: int = 30
     circuit_breaker_half_open_max_calls: int = 3
+
+    @property
+    def resolved_database_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        return (
+            f"mysql+aiomysql://{self.mysql_user}:{self.mysql_password}"
+            f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+            f"?charset={self.mysql_charset}"
+        )
+
+    @property
+    def resolved_redis_url(self) -> str:
+        if self.redis_url:
+            return self.redis_url
+        auth = f":{self.redis_password}@" if self.redis_password else ""
+        return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
 settings = Settings()

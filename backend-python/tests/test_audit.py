@@ -2,24 +2,20 @@ from __future__ import annotations
 
 import time
 import uuid
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.agent_runtime.audit import PersistentAuditStore
-from app.infrastructure.database.models import Base
-from app.infrastructure.database.session import create_async_db_engine
 from app.main import create_app
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @pytest.mark.asyncio
-async def test_persistent_audit_store_saves_and_filters_events(tmp_path: Path) -> None:
+async def test_persistent_audit_store_saves_and_filters_events(mysql_engine: AsyncEngine) -> None:
     from app.agent_runtime.events import AgentEvent
 
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'audit.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    engine = mysql_engine
 
     store = PersistentAuditStore(engine)
     turn_id = str(uuid.uuid4())
@@ -43,7 +39,6 @@ async def test_persistent_audit_store_saves_and_filters_events(tmp_path: Path) -
     events = await store.list_events(session_id="s1")
     assert {event["event_type"] for event in events} == {"turn.started", "model.call"}
     assert all(event["turn_id"] == turn_id for event in events)
-    await engine.dispose()
 
 
 def test_audit_api_returns_events_after_chat_turn() -> None:

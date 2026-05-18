@@ -3,16 +3,14 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.agent_runtime.turn import AgentTurnContext, AgentTurnResult
-from app.infrastructure.database.models import Base
-from app.infrastructure.database.session import create_async_db_engine
 from app.main import create_app
 from app.scheduler.service import AgentSchedulerService
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 class FakeRuntime:
@@ -43,11 +41,8 @@ class FakeRuntime:
 
 
 @pytest.mark.asyncio
-async def test_scheduler_runs_due_job_through_runtime(tmp_path: Path) -> None:
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'scheduler.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+async def test_scheduler_runs_due_job_through_runtime(mysql_engine: AsyncEngine) -> None:
+    engine = mysql_engine
     scheduler = AgentSchedulerService(engine)
     runtime = FakeRuntime()
     job = await scheduler.create_job(
@@ -68,7 +63,6 @@ async def test_scheduler_runs_due_job_through_runtime(tmp_path: Path) -> None:
     assert runtime.contexts[0].channel == "scheduler"
     assert runtime.contexts[0].metadata["job_id"] == job["job_id"]
     assert runtime.contexts[0].messages[0].content.startswith("[Scheduled task]")
-    await engine.dispose()
 
 
 def test_scheduler_api_creates_lists_and_runs_due_job() -> None:
