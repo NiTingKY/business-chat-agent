@@ -34,6 +34,30 @@ def test_sqlite_vector_store_persists_and_searches_chunks(tmp_path: Path) -> Non
     assert results[0]["backend"] == "sqlite"
 
 
+def test_milvus_lite_vector_store_persists_and_searches_chunks(tmp_path: Path) -> None:
+    db_path = tmp_path / "milvus_lite.db"
+    store = MilvusDocumentStore(host="localhost", port=19530, lite_path=db_path)
+    assert store.connect()
+
+    store.insert_vector(
+        doc_id="policy-lite#0001",
+        title="Lite 差旅政策",
+        doc_type="policy",
+        content="经理级员工单次出差预算超过3000元，需要提前完成审批。",
+        vector=[0.5] * 768,
+        metadata={"source": "test"},
+    )
+
+    reopened = MilvusDocumentStore(host="localhost", port=19530, lite_path=db_path)
+    assert reopened.connect()
+    results = reopened.search([0.5] * 768, top_k=1)
+
+    assert results[0]["id"] == "policy-lite#0001"
+    assert "超过3000元" in results[0]["content"]
+    assert results[0]["backend"] == "milvus_lite"
+    assert results[0]["metadata"] == {"source": "test"}
+
+
 @pytest.mark.asyncio
 async def test_policy_tool_appends_vector_policy_evidence() -> None:
     class FakePolicyStore:

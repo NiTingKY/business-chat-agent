@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     milvus_host: str = "localhost"
     milvus_port: int = 19530
+    milvus_lite_path: str = ""
     log_level: str = "INFO"
     workspace_dir: str = "workspace"
     default_agent_id: str = "travel-agent"

@@ -36,8 +36,10 @@ class MilvusDocumentStore:
     host: str
     port: int
     sqlite_path: str | Path | None = None
+    lite_path: str | Path | None = None
     collection_name: str = COLLECTION_NAME
     _collection: Any = None
+    _lite_client: Any = None
     _connected: bool = field(default=False, init=False)
     _backend: str = field(default="milvus", init=False)
     _memory_docs: list[dict[str, Any]] = field(default_factory=list, init=False)
@@ -51,6 +53,8 @@ class MilvusDocumentStore:
         return self._backend
 
     def connect(self) -> bool:
+        if self.lite_path:
+            return self.connect_lite()
         if self._connected and self._collection is not None:
             return True
         try:
@@ -96,6 +100,69 @@ class MilvusDocumentStore:
                 return True
             self._connected = False
             self._collection = None
+            return False
+
+    def connect_lite(self) -> bool:
+        if self._connected and self._lite_client is not None:
+            return True
+        try:
+            from pymilvus import DataType, MilvusClient
+
+            path = Path(self.lite_path or "milvus_lite.db")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            client = MilvusClient(str(path))
+            if not client.has_collection(self.collection_name):
+                schema = MilvusClient.create_schema(auto_id=False, enable_dynamic_field=False)
+                schema.add_field(
+                    field_name="id",
+                    datatype=DataType.VARCHAR,
+                    is_primary=True,
+                    max_length=128,
+                )
+                schema.add_field(
+                    field_name="vector",
+                    datatype=DataType.FLOAT_VECTOR,
+                    dim=settings.embedding_dimension,
+                )
+                schema.add_field(
+                    field_name="title",
+                    datatype=DataType.VARCHAR,
+                    max_length=512,
+                )
+                schema.add_field(
+                    field_name="doc_type",
+                    datatype=DataType.VARCHAR,
+                    max_length=32,
+                )
+                schema.add_field(
+                    field_name="content",
+                    datatype=DataType.VARCHAR,
+                    max_length=65535,
+                )
+                schema.add_field(
+                    field_name="metadata_json",
+                    datatype=DataType.VARCHAR,
+                    max_length=8192,
+                )
+                index_params = client.prepare_index_params()
+                index_params.add_index(
+                    field_name="vector",
+                    index_type="FLAT",
+                    metric_type="COSINE",
+                )
+                client.create_collection(
+                    collection_name=self.collection_name,
+                    schema=schema,
+                    index_params=index_params,
+                )
+            self._lite_client = client
+            self._backend = "milvus_lite"
+            self._connected = True
+            return True
+        except Exception as exc:
+            logger.warning("milvus_lite.connect_failed", error=str(exc))
+            self._lite_client = None
+            self._connected = False
             return False
 
     def use_sqlite_fallback(self) -> None:
@@ -182,6 +249,23 @@ class MilvusDocumentStore:
                 }
             )
             return
+        if self._backend == "milvus_lite":
+            if self._lite_client is None:
+                raise RuntimeError("Milvus Lite not connected")
+            self._lite_client.upsert(
+                collection_name=self.collection_name,
+                data=[
+                    {
+                        "id": doc_id,
+                        "vector": vector,
+                        "title": title[:512],
+                        "doc_type": doc_type[:32],
+                        "content": content[:65530],
+                        "metadata_json": json.dumps(metadata or {}, ensure_ascii=False),
+                    }
+                ],
+            )
+            return
         if not self._collection:
             raise RuntimeError("Milvus not connected")
         self._collection.insert(
@@ -203,6 +287,14 @@ class MilvusDocumentStore:
         if self._backend == "memory":
             self._memory_docs.clear()
             return
+        if self._backend == "milvus_lite":
+            if self._lite_client is not None and self._lite_client.has_collection(
+                self.collection_name
+            ):
+                self._lite_client.drop_collection(self.collection_name)
+                self._connected = False
+                self.connect_lite()
+            return
         if self._collection is not None:
             self._collection.delete("id != ''")
             self._collection.flush()
@@ -218,6 +310,8 @@ class MilvusDocumentStore:
             return self._search_sqlite(vector, top_k, query=query)
         if self._backend == "memory":
             return self._search_memory(vector, top_k, query=query)
+        if self._backend == "milvus_lite":
+            return self._search_lite(vector, top_k, query=query)
         if not self._collection:
             raise RuntimeError("Milvus not connected")
         self._collection.load()
@@ -250,6 +344,46 @@ class MilvusDocumentStore:
                     "title": ent.get("title"),
                     "doc_type": ent.get("doc_type"),
                     "content": str(ent.get("content") or "")[:2000],
+                }
+            )
+        return hits
+
+    def _search_lite(
+        self,
+        vector: List[float],
+        top_k: int,
+        *,
+        query: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        if self._lite_client is None:
+            raise RuntimeError("Milvus Lite not connected")
+        res = self._lite_client.search(
+            collection_name=self.collection_name,
+            data=[vector],
+            limit=top_k,
+            output_fields=["title", "doc_type", "content", "metadata_json"],
+        )
+        hits: list[dict[str, Any]] = []
+        for hit in res[0]:
+            entity = hit.get("entity") or {}
+            metadata_json = entity.get("metadata_json") or "{}"
+            try:
+                metadata = json.loads(metadata_json)
+            except json.JSONDecodeError:
+                metadata = {}
+            vector_score = float(hit.get("distance", 0.0))
+            keyword_score = _keyword_score(query or "", f"{entity.get('title')} {entity.get('content')}")
+            hits.append(
+                {
+                    "id": hit.get("id"),
+                    "score": vector_score + keyword_score,
+                    "vector_score": vector_score,
+                    "keyword_score": keyword_score,
+                    "title": entity.get("title"),
+                    "doc_type": entity.get("doc_type"),
+                    "content": str(entity.get("content") or "")[:2000],
+                    "backend": "milvus_lite",
+                    "metadata": metadata,
                 }
             )
         return hits
@@ -362,7 +496,12 @@ def _query_terms(query: str) -> list[str]:
 
 
 def get_milvus_store() -> MilvusDocumentStore:
-    return MilvusDocumentStore(host=settings.milvus_host, port=settings.milvus_port)
+    lite_path = settings.milvus_lite_path.strip() or None
+    return MilvusDocumentStore(
+        host=settings.milvus_host,
+        port=settings.milvus_port,
+        lite_path=lite_path,
+    )
 
 
 def utc_now() -> datetime:

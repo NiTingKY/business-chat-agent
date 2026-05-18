@@ -64,6 +64,7 @@ async def health(request: Request) -> HealthStatus:
 
     return HealthStatus(
         status=status,
+        agent_id=getattr(getattr(request.app.state, "agent_config", None), "agent_id", None),
         checks=checks,
         detail="; ".join(detail_parts) if detail_parts else None,
     )

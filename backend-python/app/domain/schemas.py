@@ -80,5 +80,6 @@ class DocumentIngestResponse(BaseModel):
 class HealthStatus(BaseModel):
     status: Literal["ok", "degraded", "unhealthy"]
     version: str = "0.1.0"
+    agent_id: Optional[str] = None
     checks: dict[str, bool] = Field(default_factory=dict)
     detail: Optional[str] = None
