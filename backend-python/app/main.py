@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
     app.state.redis = None
     app.state.redis_error = None
     try:
-        app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
+        app.state.redis = redis.from_url(settings.resolved_redis_url, decode_responses=True)
         await app.state.redis.ping()
         logger.info("redis.connected")
     except Exception as exc:
@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
         from app.infrastructure.database.session import create_async_db_engine
         from app.infrastructure.database.models import Base
         app.state.db_engine = create_async_db_engine(
-            settings.database_url,
+            settings.resolved_database_url,
             pool_size=5,
             max_overflow=10,
         )

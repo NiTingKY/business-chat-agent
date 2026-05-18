@@ -1,4 +1,5 @@
 from datetime import datetime
+from hashlib import sha256
 from typing import Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -48,12 +49,13 @@ class AgentMemoryRepository:
         importance: float = 0.6,
         metadata: dict[str, Any] | None = None,
     ) -> AgentMemoryRecord:
+        text_hash = sha256(text.encode("utf-8")).hexdigest()
         existing = await self.session.execute(
             select(AgentMemoryRecord).where(
                 AgentMemoryRecord.agent_id == agent_id,
                 AgentMemoryRecord.session_id == session_id,
                 AgentMemoryRecord.user_id == user_id,
-                AgentMemoryRecord.text == text,
+                AgentMemoryRecord.text_hash == text_hash,
             )
         )
         record = existing.scalars().first()
@@ -63,12 +65,14 @@ class AgentMemoryRepository:
                 session_id=session_id,
                 user_id=user_id,
                 text=text,
+                text_hash=text_hash,
                 source=source,
                 importance=importance,
                 metadata_json=metadata or {},
             )
             self.session.add(record)
         else:
+            record.text = text
             record.source = source
             record.importance = importance
             record.metadata_json = metadata or {}

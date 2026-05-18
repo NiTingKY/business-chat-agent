@@ -21,6 +21,19 @@ jobs:
   backend-smoke:
     name: Python backend smoke
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: 123456
+          MYSQL_DATABASE: travelagent
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p123456"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     defaults:
       run:
         working-directory: backend-python
@@ -42,14 +55,24 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
 
+      - name: Initialize MySQL schema
+        run: mysql -h 127.0.0.1 -uroot -p123456 < deploy/mysql/schema.sql
+
       - name: Run backend tests
         env:
           OPENAI_API_KEY: test-key
           OPENAI_BASE_URL: https://example.invalid/v1
           OPENAI_MODEL: gpt-4o-mini
           OPENAI_EMBEDDING_MODEL: text-embedding-3-small
-          DATABASE_URL: sqlite+aiosqlite:///./travel_agent_test.db
-          REDIS_URL: redis://localhost:6379/0
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: "3306"
+          MYSQL_DATABASE: travelagent
+          MYSQL_USER: root
+          MYSQL_PASSWORD: "123456"
+          MYSQL_CHARSET: utf8mb4
+          REDIS_HOST: localhost
+          REDIS_PORT: "6379"
+          REDIS_DB: "0"
           MILVUS_HOST: localhost
           MILVUS_PORT: "19530"
           ENABLE_MEMORY_VECTOR_STORE: "true"

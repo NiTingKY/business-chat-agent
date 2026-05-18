@@ -174,7 +174,7 @@ class MilvusDocumentStore:
     def _sqlite_file(self) -> Path:
         if self.sqlite_path is not None:
             return Path(self.sqlite_path)
-        url = settings.database_url
+        url = settings.resolved_database_url
         prefix = "sqlite+aiosqlite:///"
         if url.startswith(prefix):
             return Path(url[len(prefix) :])

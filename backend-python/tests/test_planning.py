@@ -3,16 +3,14 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.agent_runtime.runtime import AgentRuntime
 from app.agent_runtime.session import AgentSession
 from app.agent_runtime.turn import AgentTurnContext
 from app.domain.schemas import ChatMessage, MessageRole, StreamChunk
-from app.infrastructure.database.models import Base
-from app.infrastructure.database.session import create_async_db_engine
 from app.planning import HeuristicTravelPlanner, PersistentPlanStore
 
 
@@ -96,11 +94,8 @@ def test_heuristic_planner_builds_travel_steps() -> None:
 
 
 @pytest.mark.asyncio
-async def test_plan_store_saves_and_loads_steps(tmp_path: Path) -> None:
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'plans.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+async def test_plan_store_saves_and_loads_steps(mysql_engine: AsyncEngine) -> None:
+    engine = mysql_engine
     planner = HeuristicTravelPlanner()
     plan = planner.build_plan(
         turn_id="turn-store",
@@ -124,15 +119,11 @@ async def test_plan_store_saves_and_loads_steps(tmp_path: Path) -> None:
     assert loaded.plan_id == plan.plan_id
     assert len(loaded.steps) == len(plan.steps)
     assert loaded.steps[1].suggested_tool == "check_travel_policy"
-    await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_runtime_creates_plan_for_complex_turn(tmp_path: Path) -> None:
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'runtime-plans.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+async def test_runtime_creates_plan_for_complex_turn(mysql_engine: AsyncEngine) -> None:
+    engine = mysql_engine
     orchestrator = FakeOrchestrator()
     plan_store = PersistentPlanStore(engine)
     runtime = AgentRuntime(
@@ -165,4 +156,3 @@ async def test_runtime_creates_plan_for_complex_turn(tmp_path: Path) -> None:
     assert loaded is not None
     assert len(loaded.steps) >= 3
     assert any(event["type"] == "plan.step.created" for event in result.events)
-    await engine.dispose()

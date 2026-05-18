@@ -298,3 +298,31 @@ python -m pytest -q
 ## 下一阶段
 
 下一步可以继续做端到端真实模型联调和生产化收尾：补充数据库迁移策略、配置样例、错误告警、真实 API smoke case，并根据实际模型返回调优 prompt。
+
+## MySQL persistence
+
+The relational business data backend now defaults to MySQL. It stores chat history, semantic memories, audit events, scheduled jobs, plan runs, and plan steps.
+
+Default local settings:
+
+```text
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=travelagent
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_CHARSET=utf8mb4
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+Initialize the database schema before running the backend or tests:
+
+```powershell
+mysql -h localhost -uroot -p123456 < deploy/mysql/schema.sql
+```
+
+`DATABASE_URL` remains available as an explicit SQLAlchemy URL override, but normal local and CI runs should use the MySQL settings above.
+
+`agent_memories.text` stores the extracted memory sentence shown back to the agent as long-term context. `agent_memories.text_hash` is a SHA-256 hash used for safe MySQL de-duplication of long memory text.

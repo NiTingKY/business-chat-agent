@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
 import time
 import uuid
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.agent_runtime.runtime import AgentRuntime
 from app.agent_runtime.session import AgentSession
 from app.agent_runtime.turn import AgentTurnContext
 from app.domain.schemas import ChatMessage, MessageRole
-from app.infrastructure.database.models import Base
-from app.infrastructure.database.session import create_async_db_engine
 from app.planning import HeuristicTravelPlanner, PersistentPlanStore
 from app.planning.executor import PlanStepExecutor
 from app.tools.travel import default_travel_tool_registry
@@ -102,11 +100,8 @@ async def test_executor_skips_tool_steps_when_date_is_missing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_plan_store_persists_execution_result(tmp_path: Path) -> None:
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'plan-execution.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+async def test_plan_store_persists_execution_result(mysql_engine: AsyncEngine) -> None:
+    engine = mysql_engine
     plan = _build_plan(
         "我是经理，帮我规划北京到上海的出差行程，出发日期是2026-06-01，预算3000元，检查差标。"
     )
@@ -121,15 +116,11 @@ async def test_plan_store_persists_execution_result(tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.status == "completed"
     assert any(step.status == "completed" and step.output for step in loaded.steps)
-    await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_runtime_executes_plan_steps_and_injects_summary(tmp_path: Path) -> None:
-    engine = create_async_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'runtime-plan-execution.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+async def test_runtime_executes_plan_steps_and_injects_summary(mysql_engine: AsyncEngine) -> None:
+    engine = mysql_engine
     orchestrator = FakeOrchestrator()
     plan_store = PersistentPlanStore(engine)
     runtime = AgentRuntime(
@@ -167,4 +158,3 @@ async def test_runtime_executes_plan_steps_and_injects_summary(tmp_path: Path) -
     assert "[Plan execution]" in orchestrator.received[-2].content
     assert any(event["type"] == "plan.step.completed" for event in result.events)
     assert any(event["type"] == "plan.completed" for event in result.events)
-    await engine.dispose()
