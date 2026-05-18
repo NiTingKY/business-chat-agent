@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>差旅助手</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="差旅助手对话">
+        <header class="topbar">
+          <div>
+            <h1>差旅助手</h1>
+            <p id="statusText" class="status" data-tone="neutral">正在初始化...</p>
+          </div>
+          <button id="resetSession" class="icon-button" type="button" title="新会话" aria-label="新会话">
+            ↻
+          </button>
+        </header>
+
+        <div class="settings-row">
+          <label for="apiBaseUrl">后端地址</label>
+          <input id="apiBaseUrl" type="url" autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="session-row">
+          <span>Session</span>
+          <code id="sessionId"></code>
+        </div>
+
+        <section id="chatLog" class="chat-log" aria-live="polite"></section>
+
+        <form id="chatForm" class="composer">
+          <textarea
+            id="messageInput"
+            rows="3"
+            placeholder="描述你的差旅需求..."
+            autocomplete="off"
+          ></textarea>
+          <button id="sendButton" type="submit">发送</button>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

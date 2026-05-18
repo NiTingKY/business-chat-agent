@@ -9,7 +9,8 @@ aiomysql==0.2.0
 cryptography>=42.0.0
 sqlalchemy[asyncio]==2.0.35
 aiosqlite==0.20.0
-pymilvus==2.4.7
+pymilvus==3.0.0
+milvus-lite==3.0
 marshmallow<4
 environs<11
 python-dotenv==1.0.1
