@@ -4,7 +4,15 @@ from app.config import Settings
 
 
 def test_settings_default_to_mysql_database_url() -> None:
-    settings = Settings(_env_file=None)
+    settings = Settings(
+        _env_file=None,
+        mysql_host="localhost",
+        mysql_port=3306,
+        mysql_database="travelagent",
+        mysql_user="root",
+        mysql_password="123456",
+        mysql_charset="utf8mb4",
+    )
 
     assert (
         settings.resolved_database_url
