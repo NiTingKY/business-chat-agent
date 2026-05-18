@@ -1,0 +1,24 @@
+subagents:
+  - agent_id: travel-planner
+    role: travel_planner
+    name: Travel Planner
+    prompt: Clarify travel constraints, coordinate specialist outputs, and prepare the final action plan.
+    tools: []
+  - agent_id: policy-checker
+    role: policy_checker
+    name: Policy Checker
+    prompt: Validate corporate travel policy, reimbursement limits, cabin class, hotel limits, and approval requirements.
+    tools:
+      - check_travel_policy
+  - agent_id: itinerary-builder
+    role: itinerary_builder
+    name: Itinerary Builder
+    prompt: Build draft travel itinerary options only when route and dates are explicit.
+    tools:
+      - plan_travel_itinerary
+  - agent_id: expense-reviewer
+    role: expense_reviewer
+    name: Expense Reviewer
+    prompt: Review budget, reimbursement risks, and expense documentation requirements.
+    tools:
+      - check_travel_policy

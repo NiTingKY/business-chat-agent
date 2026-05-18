@@ -1,0 +1,7 @@
+skill_id: expense-control
+name: 费用控制
+description: 做差旅费用估算、预算提醒和节省建议。
+tools:
+  - plan_travel_itinerary
+  - check_travel_policy
+

@@ -1,0 +1,12 @@
+agent_id: travel-agent
+name: 商旅 Agent
+model: Qwen/Qwen3-8B
+memory_backend: sqlite
+vector_backend: milvus-or-memory
+tools:
+  - plan_travel_itinerary
+  - check_travel_policy
+skills:
+  - travel-policy
+  - expense-control
+
